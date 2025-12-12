@@ -1,2 +1,13 @@
 data/
 .DS_Store
+cleaned_data/
+data/
+model_data/
+*.pkl
+*.csv
+cleaned_data/
+data/
+model_data/
+*.pkl
+*.csv
+*.parquet
