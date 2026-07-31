@@ -498,6 +498,57 @@ def carrier_table_aggregation(df: pd.DataFrame):
     
     return df_cleaned
 
+def reconcile_disease_flags(dfs, id_cols=["DESYNPUF_ID", "claim_year"]):
+    """
+    Merge multiple datasets and reconcile overlapping disease flags.
+    If any source has a disease/burden flag = 1, final flag = 1.
+
+    Args:
+        dfs (list): list of aggregated patient-year datasets
+        id_cols (list): merge keys
+
+    Returns:
+        pd.DataFrame: merged dataset with reconciled disease flags
+    """
+
+    merged = dfs[0].copy()
+
+    for i, df in enumerate(dfs[1:], start=1):
+        merged = merged.merge(
+            df,
+            on=id_cols,
+            how="outer",
+            suffixes=("", f"_source{i}")
+        )
+
+    # identify disease columns
+    disease_cols = [
+        col for col in merged.columns
+        if col.startswith("has_")
+    ]
+
+    # reconcile duplicated disease columns
+    base_names = set(
+        col.split("_source")[0]
+        for col in disease_cols
+    )
+
+    for disease in base_names:
+        related_cols = [
+            col for col in disease_cols
+            if col == disease or col.startswith(disease + "_source")
+        ]
+
+        if len(related_cols) > 1:
+            merged[disease] = merged[related_cols].max(axis=1)
+
+            merged.drop(
+                columns=[c for c in related_cols if c != disease],
+                inplace=True
+            )
+
+    return merged
+
 
 
 
