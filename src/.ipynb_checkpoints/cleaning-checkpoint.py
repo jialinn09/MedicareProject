@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from icdmappings import Mapper
 
 def print_table(df):
     """
@@ -116,7 +117,6 @@ def mapping_beneficiary_demographics(df: pd.DataFrame):
         19: "LA", 
         20: "ME", 
         21: "MD", 
-        22: "MA",
         23: "MI", 
         24: "MN", 
         25: "MS", 
@@ -238,7 +238,6 @@ def checking_claims_logic(df: pd.DataFrame):
                            MSP/review flags, and a reconciliation
                            check column.
     """
-    df = df.copy()
 
     ind_cols = [f"LINE_PRCSG_IND_CD_{i}" for i in range(1, 14)]
 
@@ -316,6 +315,193 @@ def checking_claims_logic(df: pd.DataFrame):
     df["reimb_valid"] = np.where(df["has_msp_line"], True, base_check)
 
     return df
+
+def icd_mappings(df: pd.DataFrame, count: int, special_col: str=None):
+    """
+    Map ICD-9 diagnostic codes into CCS and CCI indicators. 
+
+    Args:
+        df (pd.DataFrame): the data table to perform icd mappings on.
+        count (int): number of ICD diagnosis columns to map + 1 to buffer.
+        special_col (str, optional): additional ICD-9 column to map if it does not follow the standard naming convention (e.g., "ADMTNG_ICD9_DGNS_CD").
+
+
+    Returns:
+        df (pd.DataFrame): the data table with clinically meaningful disease categorizations.
+    """
+    mapper = Mapper()
+    diag_cols = [f"ICD9_DGNS_CD_{i}" for i in range(1,count)]
+    if special_col is not None:
+        diag_cols.append(special_col)
+   
+    # Step 1: get all unique ICD codes without melting which explodes row counts
+    unique_codes = pd.Series(pd.unique(df[diag_cols].values.ravel())).dropna()
+
+    # Step 2: set up the dictionary
+    cci_lookup = {}
+    ccs_lookup = {}
+    for code in unique_codes:
+        try:
+        # chronic condition flag
+            cci_lookup[code] = mapper.map(code, source='icd9', target='cci')
+        except Exception:
+            cci_lookup[code] = None
+        try:
+        # form clinical categories
+            ccs_lookup[code] = mapper.map(code, source='icd9', target='ccs')
+        except Exception:
+            ccs_lookup[code] = None
+
+    # Step 3: map column-by-column
+    for i, diag_col in enumerate(diag_cols, start=1):
+        df[f"CCI_{i}"] = df[diag_col].map(cci_lookup).astype("float32")
+        df[f"CCS_{i}"] = df[diag_col].map(ccs_lookup).astype("float32")
+
+    return df
+
+
+def disease_burden_mappings(df: pd.DataFrame):
+    """
+    Map CCS codes into disease burden buckets. 
+
+    Args:
+        df (pd.DataFrame): the data table to perform categorical mappings on.
+
+    Returns:
+        df (pd.DataFrame): the data table with clinically meaningful disease categorizations.
+    """
+    disease_burden_map = {"Alzheimer's/Dementia": {653},
+                          "Heart Failure": {108},
+                          "CKD": {158},
+                          "Cancer": set(range(11, 46)),
+                          "COPD": {127, 131},
+                          "Depression": {657},
+                          "Diabetes": {49, 50},
+                          "Ischemic Heart Disease": {100, 101},
+                          "Osteoporosis": {206},
+                          "Rheumatoid Arthritis/Osteoarthritis": {202, 203},
+                          "Stroke/TIA": set(range(109, 114)),
+                          "Infectious disease burden": set(range(1, 11)) | 
+                          set(range(122, 127)) | {135, 197, 201},
+                          "Additional cardiovascular burden": set(range(96, 108)) |
+                          set(range(114, 122)) | {98, 99},
+                          "Additional respiratory burden": set(range(128-135)) |{56},
+                          "Additional neurologic burden": set(range(76, 86)) | 
+                          set(range(79, 84)) | {95},
+                          "Additional mental health burden": set(range(650, 653)) | 
+                          set(range(645, 657)) | set(range(658, 664)) | {670},
+                          "Additional endocrine/metabolic burden": {48} | set(range(51, 59)),
+                          "Additional Hematologic burden": set(range(59, 65)),
+                          "Additional GI/Hepatic burden": set(range(136, 156)) | 
+                          set(range(149, 152)),
+                          "Additional renal burden": set(range(156, 158)) | 
+                          set(range(159, 164)), 
+                          "Additional Musculoskeletal Burden": set(range(204, 213)) | {54},
+                          "Sensory Burden": set(range(86, 95)),
+                          "Injury/Frailty Burden": set(range(225, 245)) | 
+                          set(range(259,261)) | set(range(2601, 2622)) | {252, 245, 248, 249},
+                          "Genitourinary (non-renal) burden": set(range(164, 176)),
+                          "Administrative_screening_aftercare": {254, 255, 256, 257, 258}
+                         }
+    disease_category_lookup = {code:disease for disease, codes in 
+                               disease_burden_map.items() for code in codes}
+    diag_ccs_cols = [c for c in df.columns if c.startswith("CCS_")]
+
+    for col in diag_ccs_cols:
+        df[col.replace("CCS", "DISEASE_CATEGORY")] = df[col].map(disease_category_lookup)
+        
+    return df
+
+
+def disease_mapping_cleaned(df: pd.DataFrame):
+    """
+    Clean up the disease_burden_mapping artifacts to one-hot-encode the diseases and also include a count of claim lines and the amount of chronic codes per claim.. 
+
+    Args:
+        df (pd.DataFrame): the data table to perform categorical mappings on.
+
+    Returns:
+        df (pd.DataFrame): the data table with clinically meaningful disease categorizations.
+    """
+    # dropping ICD9 and CCS columns now since disease buckets are informative on its own
+    prefix_columns = [c for c in df.columns if c.startswith(("ICD9_DGNS_CD", "CCS"))]
+    df_cleaned = df.drop(columns=prefix_columns)
+    
+    # one-hot-encode the diseases
+    disease_cols = [c for c in df_cleaned.columns if c.startswith("DISEASE_CATEGORY_")]
+
+    all_diseases = df_cleaned[disease_cols].stack().dropna().unique()
+    for disease in all_diseases:
+        df_cleaned[f"has_{disease}"] = df_cleaned[disease_cols].eq(disease).any(axis=1).astype(int)
+        
+    # compute the claim line counts and amount of chronic codes per claim
+    claim_line_cols = [c for c in df_cleaned.columns if c.startswith("CCI_")]
+    disease_columns = [c for c in df_cleaned.columns if c.startswith("has_")]
+    df_cleaned["num_claim_lines"] = df_cleaned[disease_columns].sum(axis=1)
+    df_cleaned["num_chronic_codes"] = df_cleaned[claim_line_cols].sum(axis=1)
+    df_cleaned.drop(columns = claim_line_cols, inplace=True)
+    
+    # drop the disease categories
+    df_cleaned.drop(columns = disease_cols, inplace=True)
+
+    return df_cleaned
+    
+
+def carrier_table_aggregation(df: pd.DataFrame):
+    """
+    Clean and aggregate carriers into patient-year granularity for downstream work. 
+
+    Args:
+        df (pd.DataFrame): the data table to perform cleaning and aggregations on.
+
+    Returns:
+        df (pd.DataFrame): the data table with correct granularities.
+    """
+    # Step 1: Cleaning
+    disease_cols = [c for c in df.columns if c.startswith("has_")]
+    df.drop(columns=["CLM_FROM_DT", "CLM_THRU_DT"], inplace=True)
+
+    # Step 2: Aggregating
+    agg_dict = {
+        "CLM_ID": "count",
+        "claim_duration": ["mean", "max", "sum"],
+        "CARRIER_REJECTED_AMT": ["mean", "max", "sum"],
+        "pct_rejected": ["mean", "max"],
+        "overage": ["mean", "min", "max", "sum"],
+        "num_chronic_codes":["max"]
+    }
+    for col in disease_cols:
+        agg_dict[col] = "max"
+    df_cleaned = df.groupby(["DESYNPUF_ID", "claim_year"]).agg(agg_dict).reset_index()
+    df_cleaned.columns = ["_".join(col).strip("_") if isinstance(col, tuple) else col for col in df_cleaned.columns]
+
+    # Step 3: Renaming columns
+    df_cleaned = df_cleaned.rename(columns={
+        "CLM_ID_count": "num_claim_lines",
+        "claim_duration_mean": "avg_claim_duration",
+        "claim_duration_max": "max_claim_duration",
+        "claim_duration_sum": "total_claim_duration",
+        "CARRIER_REJECTED_AMT_mean": "avg_carrier_rejected_amt",
+        "CARRIER_REJECTED_AMT_max": "max_carrier_rejected_amt",
+        "CARRIER_REJECTED_AMT_sum": "total_carrier_rejected_amt",
+        "pct_rejected_mean": "avg_carrier_claim_rejected_rate (%)",
+        "pct_rejected_max": "max_carrier_claim_rejected_rate (%)",
+        "overage_mean": "avg_reimb_allowed_diff",
+        "overage_min": "min_reimb_allowed_diff",
+        "overage_max": "max_reimb_allowed_diff",
+        "overage_sum": "total_reimb_allowed_diff",
+        "num_chronic_codes_max": "max_chronic_code_counts"
+    })
+    df_cleaned.columns = [col.replace("_max", "") if col.startswith("has_") else col for col in df_cleaned.columns]
+    df_cleaned["avg_carrier_claim_rejected_rate (%)"] *= 100
+    df_cleaned["max_carrier_claim_rejected_rate (%)"] *= 100
+    
+    return df_cleaned
+
+
+
+
+    
 
 
     
