@@ -468,7 +468,9 @@ def carrier_table_aggregation(df: pd.DataFrame):
         "CARRIER_REJECTED_AMT": ["mean", "max", "sum"],
         "pct_rejected": ["mean", "max"],
         "overage": ["mean", "min", "max", "sum"],
-        "num_chronic_codes":["max"]
+        "num_chronic_codes":["max"],
+        "carrier_insurance_cost": ["mean", "max", "sum"],
+        "carrier_beneficiary_cost": ["mean", "max", "sum"]
     }
     for col in disease_cols:
         agg_dict[col] = "max"
@@ -490,7 +492,13 @@ def carrier_table_aggregation(df: pd.DataFrame):
         "overage_min": "min_reimb_allowed_diff",
         "overage_max": "max_reimb_allowed_diff",
         "overage_sum": "total_reimb_allowed_diff",
-        "num_chronic_codes_max": "max_chronic_code_counts"
+        "num_chronic_codes_max": "max_chronic_code_counts",
+        "carrier_insurance_cost_mean": "avg_carrier_insurance_cost",
+        "carrier_insurance_cost_max": "max_carrier_insurance_cost",
+        "carrier_insurance_cost_sum": "total_carrier_insurance_cost",
+        "carrier_beneficiary_cost_mean": "avg_carrier_beneficiary_cost",
+        "carrier_beneficiary_cost_max": "max_carrier_beneficiary_cost",
+        "carrier_beneficiary_cost_sum": "total_carrier_beneficiary_cost"
     })
     df_cleaned.columns = [col.replace("_max", "") if col.startswith("has_") else col for col in df_cleaned.columns]
     df_cleaned["avg_carrier_claim_rejected_rate (%)"] *= 100
