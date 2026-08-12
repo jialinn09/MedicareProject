@@ -1,5 +1,11 @@
 import pandas as pd
 import numpy as np
+from sklearn.compose import ColumnTransformer 
+from sklearn.preprocessing import StandardScaler, OneHotEncoder 
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline 
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, roc_auc_score, classification_report, confusion_matrix
 
 BASELINE_FEATURES = [
     "BENE_ESRD_IND",
@@ -105,6 +111,7 @@ def build_features(df, year, id_col="DESYNPUF_ID"):
 
             2010:
                 Baseline characteristics + 2008-2009 history.
+        id_col (int): the identifier to merge tables on
     Returns:
         X (pd.DataFrame): the feature matrix for the given year.
         y (pd.DataFrame): the two prediction targets: "High_Payer_Cost" and "High_OOP_Burden".
@@ -128,13 +135,18 @@ def build_features(df, year, id_col="DESYNPUF_ID"):
     # For 2009, we need to merge 2008 historical records with the current 2009 ID + baseline
     elif year == 2009:
         history = df[df["year"] == 2008].copy()
+        esrd_history = history[[id_col, "BENE_ESRD_IND"]].copy()
+        esrd_history = esrd_history.rename(columns={"BENE_ESRD_IND": "prior_ESRD"})
+        X = X.merge(esrd_history, on=id_col, how="left")
+        history.drop(columns=BASELINE_FEATURES, inplace=True)
         history_features = (CHRONIC_COUNT_FEATURES + 
                             DISEASE_FEATURES +
                             UTILIZATION_FEATURES +
                             COST_FEATURES +
                             COVERAGE_FEATURES +
                             RISK_FEATURES)
-        history = history.rename(columns={col:f"2008_{col}" for col in history_features)
+        history = history[[id_col] + history_features]
+        history = history.rename(columns={col:f"2008_{col}" for col in history_features})
         X = X.merge(history, on=id_col, how="left")
         y = current[TARGETS].copy()
         X = X.drop(columns=[id_col])
@@ -179,14 +191,125 @@ def build_features(df, year, id_col="DESYNPUF_ID"):
                                                     "High_OOP_Burden":
                                                     "prior_High_OOP_Burden_counts"
                                                    })
+        # create the flag for prior ESRD exposure
+        esrd_history = history.groupby(id_col)["BENE_ESRD_IND"].agg(prior_ESRD="max").reset_index()
         # retrieve the recent historical data
         recent = history[history["year"] == 2009].copy()
         recent_features = UTILIZATION_FEATURES + COST_FEATURES + COVERAGE_FEATURES
         recent = recent[[id_col] + recent_features].copy()
         recent = recent.rename(columns={col: f"2009_{col}" for col in recent_features})
 
-        for features in [disease_history, chronic_history, cumulative, risk_history, recent]:
+        for features in [disease_history, chronic_history, cumulative, risk_history, recent, esrd_history]:
             X = X.merge(features, on=id_col, how="left")
         y = current[TARGETS].copy()
         X = X.drop(columns=[id_col])
+
+        # lower model performance led to investigations in multicollinearity, which then led to the distinction of which terms to be left cumulatives and which to be 2009 only
+        X.drop(columns=["2009_num_carrier_claims",	"2009_num_ip_claims", 
+                     "2009_num_op_claims",	"2009_num_pde_claims", 
+                     "2009_total_days_medsupplied", "2009_total_carrier_insurance_cost", 
+                     "2009_total_carrier_beneficiary_cost", "2009_total_inpatient_beneficiary_cost", 
+                     "2009_total_inpatient_insurance_cost_adj", "2009_total_outpatient_beneficiary_cost",	
+                     "2009_total_medoop",	"2009_total_raw_drug_cost",	
+                     "2009_total_outpatient_insurance_cost_adj", "2009_claim_processing_burden",
+                     "2009_PART_A_INSUR_CVRAGE_TOT_MONS",	"2009_PART_B_INSUR_CVRAGE_TOT_MONS",
+                     "2009_HMO_INSUR_CVRAGE_TOT_MONS",	"2009_PART_D_INSUR_CVRAGE_TOT_MONS"], inplace=True)
+        # part A insurance coverage and part B had high overlaps according to VIF
+        X.drop(columns=["cum_num_pde_claims", "cum_PART_B_INSUR_CVRAGE_TOT_MONS", "cum_total_carrier_beneficiary_cost"], inplace=True)
         return X, y
+
+def fix_feature_dtypes(X):
+    """
+    Convert duration features to numeric days and
+    ensure categorical variables have correct dtypes.
+
+    Args:         
+        X (pd.DataFrame): feature matrix
+    Returns:
+        X (pd.DataFrame): feature matrix with dtype properly fixed
+
+    """
+    duration_cols = [col for col in X.columns if "claim_duration" in col]
+    for col in duration_cols:
+        X[col] = pd.to_timedelta(X[col]).dt.days
+    X["BENE_COUNTY_CD"] = X["BENE_COUNTY_CD"].astype(str)
+    return X
+
+def run_logistic_regression_experiment(X, y):
+    """
+    Train and evaluate logistic regression for a single target.
+
+    Args:
+        X (pd.DataFrame): feature matrix
+        y (pd.DataFrame): true labels
+
+    Returns:
+        X2 (pd.DataFrame): evaluation metrics for both prediction targets
+    """
+    # Transform features
+    categorical_features = ["BENE_COUNTY_CD", "SEX", "RACE", "STATE"]
+    numeric_features = [col for col in X.columns if col not in categorical_features]
+    preprocessor = ColumnTransformer([
+        ("num", StandardScaler(), numeric_features),
+        ("cat", OneHotEncoder(handle_unknown="ignore"),
+         categorical_features)])
+    
+    # Create the model
+    lr_pipeline = Pipeline([
+        ("preprocessor", preprocessor),
+        ("model", LogisticRegression(
+            class_weight="balanced",
+            max_iter=1000,
+            random_state=42))
+    ])
+
+    results = []
+    for target in ["High_Payer_Cost", "High_OOP_Burden"]:
+        y_target = y[target]
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y_target,
+            test_size=0.2,
+            stratify=y_target,
+            random_state=42
+        )
+        lr_pipeline.fit(X_train, y_train)
+        metrics = evaluate_model(lr_pipeline, X_test, y_test)
+        results.append({"target": target, **metrics})
+
+    return pd.DataFrame(results)
+    
+def evaluate_model(model, X_test, y_test):
+    """
+    Evaluate model performance and output classification report and confusion matrix
+
+    Args:
+        model: fitted sklearn-compatible model
+        X_test (pd.DataFrame): test feature matrix
+        y_test (pd.Series): true labels for the test set
+    Returns:
+        Dictionary (dict): containing summary evaluation metrics, including ROC-AUC. 
+    """
+    
+    y_pred = model.predict(X_test)
+    y_prob = model.predict_proba(X_test)[:, 1]
+
+    print("=" * 60)
+
+    print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
+
+    print(
+        f"ROC-AUC: "
+        f"{roc_auc_score(y_test, y_prob):.4f}"
+    )
+
+    print("\nClassification Report")
+    print(classification_report(y_test, y_pred))
+
+    print("\nConfusion Matrix")
+    print(confusion_matrix(y_test, y_pred))
+
+    return {
+        "accuracy": accuracy_score(y_test, y_pred),
+        "roc_auc": roc_auc_score(y_test, y_prob)
+    }
