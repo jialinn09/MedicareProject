@@ -11,3 +11,4 @@ model_data/
 *.pkl
 *.csv
 *.parquet
+results/models/*.joblib

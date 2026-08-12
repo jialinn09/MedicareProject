@@ -2,9 +2,11 @@ import pandas as pd
 import numpy as np
 from sklearn.compose import ColumnTransformer 
 from sklearn.preprocessing import StandardScaler, OneHotEncoder 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.pipeline import Pipeline 
 from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score, classification_report, confusion_matrix
 
 BASELINE_FEATURES = [
@@ -249,21 +251,9 @@ def run_logistic_regression_experiment(X, y):
     # Transform features
     categorical_features = ["BENE_COUNTY_CD", "SEX", "RACE", "STATE"]
     numeric_features = [col for col in X.columns if col not in categorical_features]
-    preprocessor = ColumnTransformer([
-        ("num", StandardScaler(), numeric_features),
-        ("cat", OneHotEncoder(handle_unknown="ignore"),
-         categorical_features)])
-    
-    # Create the model
-    lr_pipeline = Pipeline([
-        ("preprocessor", preprocessor),
-        ("model", LogisticRegression(
-            class_weight="balanced",
-            max_iter=1000,
-            random_state=42))
-    ])
 
     results = []
+    models = {}
     for target in ["High_Payer_Cost", "High_OOP_Burden"]:
         y_target = y[target]
         X_train, X_test, y_train, y_test = train_test_split(
@@ -273,12 +263,210 @@ def run_logistic_regression_experiment(X, y):
             stratify=y_target,
             random_state=42
         )
+        preprocessor = ColumnTransformer([
+            ("num", StandardScaler(), numeric_features),
+            ("cat", OneHotEncoder(handle_unknown="ignore"),
+             categorical_features)])
+    
+        # Create the model
+        lr_pipeline = Pipeline([
+            ("preprocessor", preprocessor),
+            ("model", LogisticRegression(
+                class_weight="balanced",
+                max_iter=1000,
+                random_state=42))
+        ])
         lr_pipeline.fit(X_train, y_train)
         metrics = evaluate_model(lr_pipeline, X_test, y_test)
         results.append({"target": target, **metrics})
+        models[target] = lr_pipeline
+    return pd.DataFrame(results), models
 
-    return pd.DataFrame(results)
-    
+def run_random_forest_experiment(X, y):
+    """
+    Train and evaluate a Random Forest classifier with class weighting
+    and a small hyperparameter search.
+
+    Args:
+        X (pd.DataFrame): Feature matrix.
+        y (pd.Series): Binary prediction target.
+
+    Returns:
+        dict: Experiment results containing the best model,
+              best parameters, CV ROC-AUC, and test-set metrics.
+    """
+    categorical_features = [
+        "BENE_COUNTY_CD",
+        "SEX",
+        "RACE",
+        "STATE"
+    ]
+    numeric_features = [col for col in X.columns if col not in categorical_features]
+    preprocessor = ColumnTransformer([("cat", OneHotEncoder(handle_unknown="ignore"),
+            categorical_features), ("num", "passthrough", numeric_features)])
+    rf_pipeline = Pipeline([
+        ("preprocessor", preprocessor),
+        ("model", RandomForestClassifier(class_weight="balanced",
+                                         random_state=42,
+                                         n_jobs=1))])
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.20,
+        stratify=y,
+        random_state=42
+    )
+    # finetuning hyperparameters
+    param_grid = {
+        "model__n_estimators": [300],
+        "model__max_depth": [None, 20],
+        "model__min_samples_leaf": [1, 5],
+        "model__max_features": ["sqrt", "log2"]
+    }
+    grid_search = GridSearchCV(
+        estimator=rf_pipeline,
+        param_grid=param_grid,
+        scoring="roc_auc",
+        cv=3,
+        n_jobs=-1,
+        verbose=1
+    )
+
+    grid_search.fit(X_train, y_train)
+    best_model = grid_search.best_estimator_
+
+    y_pred = best_model.predict(X_test)
+    y_prob = best_model.predict_proba(X_test)[:, 1]
+    results = evaluate_model(
+        best_model,
+        X_test,
+        y_test
+    )
+
+    return {
+        "model": best_model,
+        "best_params": grid_search.best_params_,
+        "cv_roc_auc": grid_search.best_score_,
+        "test_results": results
+    }
+
+def refit_random_forest(X, y, best_params):
+    """
+    Refit a random forest using previously selected hyperparameters. This function is created to avoid having to re-run a 45 minute trial.
+
+    Args:
+        X (pd.DataFrame): Feature matrix.
+        y (pd.Series): Target variable.
+        best_params (dict): Previously selected RF hyperparameters.
+
+    Returns:
+        model (Pipeline): Fitted preprocessing + random forest pipeline.
+    """
+
+    categorical_features = ["BENE_COUNTY_CD", "SEX", "RACE", "STATE"]
+
+    numeric_features = [col for col in X.columns if col not in categorical_features]
+
+    preprocessor = ColumnTransformer([
+        ("num", StandardScaler(), numeric_features),
+        ("cat", OneHotEncoder(handle_unknown="ignore"),
+         categorical_features)
+    ])
+
+    rf_pipeline = Pipeline([
+        ("preprocessor", preprocessor),
+        ("model", RandomForestClassifier(
+            n_estimators=best_params["model__n_estimators"],
+            max_depth=best_params["model__max_depth"],
+            min_samples_leaf=best_params["model__min_samples_leaf"],
+            max_features=best_params["model__max_features"],
+            class_weight="balanced",
+            random_state=42,
+            n_jobs=-1
+        ))
+    ])
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        stratify=y,
+        random_state=42
+    )
+
+    rf_pipeline.fit(X_train, y_train)
+
+    return rf_pipeline
+
+def run_xgboost_experiment(X, y):
+    """
+    Train and evaluate an XGBoost classifier using a preprocessing pipeline
+    and a small hyperparameter grid.
+
+    Args:
+        X (pd.DataFrame): Feature matrix.
+        y (pd.Series): Binary prediction target.
+
+    Returns:
+        dict: Model performance metrics, best hyperparameters, and fitted model.
+    """
+    categorical_features = ["BENE_COUNTY_CD", "SEX", "RACE", "STATE"]
+    numeric_features = [col for col in X.columns if col not in categorical_features]
+    preprocessor = ColumnTransformer([
+        ("num", StandardScaler(), numeric_features),
+        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical_features)
+    ])
+    xgb = XGBClassifier(
+        objective="binary:logistic",
+        eval_metric="logloss",
+        tree_method="hist",
+        random_state=42,
+        n_jobs=1
+    )
+    xgb_pipeline = Pipeline([
+        ("preprocessor", preprocessor),
+        ("model", xgb)
+    ])
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=0.2,
+        stratify=y,
+        random_state=42
+    )
+    param_grid = {
+        "model__n_estimators": [200, 300],
+        "model__max_depth": [3, 6],
+        "model__learning_rate": [0.05, 0.1],
+        "model__subsample": [0.8],
+        "model__colsample_bytree": [0.8]
+    }
+
+    grid_search = GridSearchCV(
+        estimator=xgb_pipeline,
+        param_grid=param_grid,
+        scoring="roc_auc",
+        cv=3,
+        n_jobs=1,
+        verbose=1
+    )
+    grid_search.fit(X_train, y_train)
+    best_model = grid_search.best_estimator_
+    y_pred = best_model.predict(X_test)
+    y_prob = best_model.predict_proba(X_test)[:, 1]
+    metrics = evaluate_model(best_model, X_test, y_test)
+    return {
+        "accuracy": metrics["accuracy"],
+        "roc_auc": metrics["roc_auc"],
+        "precision": metrics["precision"],
+        "recall": metrics["recall"],
+        "f1": metrics["f1"],
+        "best_params": grid_search.best_params_,
+        "cv_roc_auc": grid_search.best_score_,
+        "model": best_model
+    }
+
 def evaluate_model(model, X_test, y_test):
     """
     Evaluate model performance and output classification report and confusion matrix
@@ -294,22 +482,28 @@ def evaluate_model(model, X_test, y_test):
     y_pred = model.predict(X_test)
     y_prob = model.predict_proba(X_test)[:, 1]
 
-    print("=" * 60)
-
-    print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
-
-    print(
-        f"ROC-AUC: "
-        f"{roc_auc_score(y_test, y_prob):.4f}"
+    report = classification_report(
+        y_test,
+        y_pred,
+        output_dict=True
     )
 
+    roc_auc = roc_auc_score(y_test, y_prob)
+    accuracy = accuracy_score(y_test, y_pred)
+    cm = confusion_matrix(y_test, y_pred)
+
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"ROC-AUC: {roc_auc:.4f}")
     print("\nClassification Report")
     print(classification_report(y_test, y_pred))
-
     print("\nConfusion Matrix")
-    print(confusion_matrix(y_test, y_pred))
+    print(cm)
 
     return {
-        "accuracy": accuracy_score(y_test, y_pred),
-        "roc_auc": roc_auc_score(y_test, y_prob)
+        "accuracy": accuracy,
+        "roc_auc": roc_auc,
+        "precision": report["1"]["precision"],
+        "recall": report["1"]["recall"],
+        "f1": report["1"]["f1-score"],
+        "confusion_matrix": cm
     }
