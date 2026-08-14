@@ -507,3 +507,27 @@ def evaluate_model(model, X_test, y_test):
         "f1": report["1"]["f1-score"],
         "confusion_matrix": cm
     }
+
+def get_test_set(X, y, target):
+    """
+    Retrieve the test set for SHAP here since in the beginning I didn't return the test set.
+    
+    Args:
+        X (pd.DataFrame): the feature matrix.
+        y (pd.Series): true labels.
+        target (str): oop burden or payer cost.
+        
+    Returns:
+        X_test (pd.DataFrame): the feature matrix for just the test set.
+        y_test (pd.Series): true labels for just the test set.
+    """
+
+    _, X_test, _, y_test = train_test_split(
+        X,
+        y[target],
+        test_size=0.2,
+        stratify=y[target],
+        random_state=42
+    )
+
+    return X_test, y_test
