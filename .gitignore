@@ -12,3 +12,10 @@ model_data/
 *.csv
 *.parquet
 results/models/*.joblib
+!results/lr_results.csv
+!results/rf_results.csv
+!results/xgb_results.csv
+!results/model_family_comparison/**
+!results/model_family_importance/**
+!results/model_feature_importance_finalized/**
+!results/risk_stratification/**
