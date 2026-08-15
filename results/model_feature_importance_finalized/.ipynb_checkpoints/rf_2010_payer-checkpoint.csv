@@ -1,0 +1,16 @@
+index,feature,importance,family
+30,cum_total_carrier_insurance_cost,0.066960016186252,Cost
+26,cum_num_carrier_claims,0.0552255925762086,Utilization
+36,cum_total_outpatient_insurance_cost_adj,0.0385597663329257,Cost
+35,cum_total_raw_drug_cost,0.037904636709908,Cost
+50,2009_avg_carrier_beneficiary_cost,0.0337769842345466,Cost
+29,cum_total_days_medsupplied,0.033181010877376,Utilization
+49,2009_avg_carrier_insurance_cost,0.0331119456643352,Cost
+48,2009_avg_carrier_reimb_allowed_diff,0.0329597204458046,Cost
+33,cum_total_outpatient_beneficiary_cost,0.0329317968681835,Cost
+28,cum_num_op_claims,0.0309339957366571,Utilization
+34,cum_total_medoop,0.0291462268245894,Cost
+53,2009_avg_outpatient_insurance_cost,0.0281127959125123,Cost
+54,2009_avg_outpatient_beneficiary_cost,0.026822492548072,Cost
+23,prior_max_carrier_chronic_code_counts,0.026302750350019,Chronic Count
+46,2009_avg_days_supplied_per_pdeclaim,0.0240031311654415,Utilization

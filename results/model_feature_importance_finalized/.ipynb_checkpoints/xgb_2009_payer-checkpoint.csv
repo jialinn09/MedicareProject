@@ -1,0 +1,16 @@
+index,feature,importance,family
+27,2008_num_carrier_claims,0.15989776,Utilization
+58,2008_High_OOP_Burden,0.13044973,Risk
+39,2008_total_carrier_insurance_cost,0.06795089,Cost
+57,2008_High_Payer_Cost,0.06694729,Risk
+31,2008_num_op_claims,0.041099723,Utilization
+17,2008_has_Diabetes,0.03505901,Disease
+51,2008_total_outpatient_insurance_cost_adj,0.034038812,Cost
+11,2008_has_Additional cardiovascular burden,0.03143049,Disease
+7,2008_has_COPD,0.026257629,Disease
+50,2008_total_raw_drug_cost,0.023686768,Cost
+0,BENE_ESRD_IND,0.023539634,Disease
+25,2008_has_CKD,0.018563557,Disease
+33,2008_num_pde_claims,0.017055012,Utilization
+41,2008_total_carrier_beneficiary_cost,0.015589287,Cost
+24,2008_has_Heart Failure,0.014393569,Disease

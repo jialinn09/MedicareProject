@@ -1,0 +1,16 @@
+index,feature,importance,family
+39,2008_total_carrier_insurance_cost,0.0785051620058746,Cost
+27,2008_num_carrier_claims,0.0639089384293965,Utilization
+41,2008_total_carrier_beneficiary_cost,0.057774748454293,Cost
+51,2008_total_outpatient_insurance_cost_adj,0.0380486777148484,Cost
+31,2008_num_op_claims,0.0373077313342131,Utilization
+47,2008_avg_outpatient_beneficiary_cost,0.0313255860755568,Cost
+40,2008_avg_carrier_beneficiary_cost,0.0299186454671847,Cost
+48,2008_total_outpatient_beneficiary_cost,0.0275095551141713,Cost
+38,2008_avg_carrier_insurance_cost,0.0265636702562479,Cost
+5,2008_max_op_chronic_code_counts,0.0263661374348702,Chronic Count
+10,2008_has_Injury/Frailty Burden,0.0258870910343613,Disease
+26,2008_has_Additional GI/Hepatic burden,0.0257468747112107,Disease
+46,2008_avg_outpatient_insurance_cost,0.0234324030826715,Cost
+21,2008_has_Additional Hematologic burden,0.0228666251312999,Disease
+50,2008_total_raw_drug_cost,0.0216369331386911,Cost
