@@ -1,0 +1,1 @@
+Please access https://public.tableau.com/app/profile/jialin.jiang4317/viz/MedicareAnalysis_17861454891190/MedicarePopulationOverview for the tableau dashboard, which is split into Medicare population overview and Beneficiary Cost Burden Segmentations. Feel free to click around and explore variables and interactional terms that you're interested in.
