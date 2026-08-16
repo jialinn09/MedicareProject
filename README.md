@@ -155,3 +155,135 @@ Major analyses include:
 * Comparison of predictive drivers across years and model types
 
 The goal is to understand not only which beneficiaries are likely to become high-cost, but also the underlying factors driving those predictions.
+
+# Insights
+
+The analysis is organized around two stakeholder perspectives: **Health Analytics** and **Payer Strategy**.
+
+For the **Health Analytics team**, several questions guide the analysis:
+
+1. What does the Medicare population look like from 2008 to 2010?
+2. What factors are associated with healthcare utilization and cost?
+3. Who are the highest-cost beneficiaries?
+
+For the **Payer Strategy team**, the analysis focuses on:
+
+1. Can we identify beneficiaries who are likely to become high-cost?
+2. What factors are associated with high healthcare costs?
+3. Where might interventions be targeted, and why?
+
+The following sections examine these questions through population-level EDA, utilization patterns, cost drivers, and high-cost beneficiary characteristics.
+
+## #1: What Does the Medicare Population Look Like from 2008 to 2010?
+
+### Population Demographics
+
+After integrating the cleaned administrative claims datasets, the final dataset contains **332,694 patient-year records** from 2008–2010. Because the unit of analysis is a patient-year, a beneficiary can contribute multiple records across different years.
+
+The demographic analysis examines each patient-year record by **sex, age band, and race**. The heatmap uses the average number of distinct service types accessed by each population as its color gradient, where darker cells represent lower average service-type utilization.
+
+### Key Insight 1: The dataset is disproportionately represented by White beneficiaries and women
+<img width="786" height="330" alt="Screenshot 2026-08-15 at 1 55 11 PM" src="https://github.com/user-attachments/assets/c4a9fa06-3c88-4df3-a182-f2670ecfaf83" />
+Women account for **55.57%** of patient-year records, compared with **44.43%** for men. The dataset is also predominantly White:
+
+* White women: 58,628 records (**82.76% of female records**)
+* White men: 47,079 records (**83.10% of male records**)
+* Black women: 7,682 records (**10.80% of female records**)
+* Black men: 5,695 records (**10.10% of male records**)
+* Hispanic women: 1,578 records (**2.23% of female records**)
+* Hispanic men: 1,240 records (**2.20% of male records**)
+* Other-race women: 2,950 records (**4.16% of female records**)
+* Other-race men: 2,624 records (**4.60% of male records**)
+
+This demographic imbalance is an important limitation when interpreting downstream findings. Patterns identified in this dataset may be more representative of the White Medicare population than of racial and ethnic groups that are less represented in the sample.
+
+### Key Insight 2: Most beneficiaries interact with multiple service types
+Across demographic groups, the average number of distinct service types accessed ranges from approximately **1.6 to 2.6**, suggesting that most patient-year records involve interaction with roughly two to three types of healthcare services.
+
+Across the full population (not shown on the visualization but available at 1_data_cleaning.ipynb):
+
+* **41.30%** accessed 3 distinct service types
+* **31.04%** accessed 2 distinct service types
+* **17.26%** accessed 1 distinct service type
+* **10.40%** accessed all 4 service types
+
+The populations with the lowest average service-type utilization include several of the oldest age groups and selected non-White populations. For example, Black men aged 95+ contributed only 101 patient-year records, while other-race men aged 95+ contributed 45 records.
+
+These smaller population cells should be interpreted cautiously. Lower observed service-type utilization could reflect differences in disease burden or healthcare access, but it may also be influenced by **small sample sizes and the structure of the underlying claims data**. 
+
+### Service-Type Utilization
+<img width="607" height="235" alt="Screenshot 2026-08-15 at 1 53 35 PM" src="https://github.com/user-attachments/assets/b8fac1e8-b179-474c-94b4-27474a5ed96e" />
+
+The distribution of service combinations provides additional context for how beneficiaries interact with the healthcare system.
+
+The largest utilization pattern consists of **carrier, outpatient, and prescription drug services**, representing approximately **37% of patient-year records**. The second-largest pattern consists of **carrier and prescription drug services** at approximately **18.8%**, followed by patient-year records with **prescription drug utilization only** at approximately **11.3%**.
+
+Overall, this suggests that prescription drug and physician/carrier services are central components of healthcare utilization within the population, while inpatient services are used by a smaller subset of beneficiaries.
+
+### Utilization by Age
+<img width="854" height="540" alt="Screenshot 2026-08-15 at 9 27 51 PM" src="https://github.com/user-attachments/assets/b3a3dd6a-2c92-462f-9135-d1b1414ebf50" />
+
+Service utilization patterns remain broadly consistent across age bands, with **carrier and prescription drug services accounting for the largest shares of utilization**.
+
+One notable exception is the **under-65 Medicare population**, which has relatively high prescription drug utilization. This population likely differs clinically from the traditional Medicare population because beneficiaries under 65 generally qualify for Medicare through disability or specific qualifying conditions. However, the dataset alone cannot establish that disability-related disease complexity is the cause of the higher prescription drug utilization.
+
+The higher prescription drug utilization is accompanied by higher drug-related payer costs in the <65 population, suggesting that this subgroup warrants additional investigation when examining cost drivers.
+
+### Cost by Age
+<img width="869" height="522" alt="Screenshot 2026-08-15 at 9 29 21 PM" src="https://github.com/user-attachments/assets/0a5c1dd7-42f3-4cca-865d-57d1e0c0c6e9" />
+
+Although the overall distribution of service types is relatively stable across age groups, **payer costs increase with age for several service categories**.
+
+In particular:
+
+* Inpatient payer costs increase with age and peak among beneficiaries aged 85–94.
+* Carrier payer costs also increase with age and peak among beneficiaries aged 85–94.
+* Prescription drug costs generally increase with age.
+* Other categories remain comparatively stable across age bands.
+
+This divergence between **relatively stable utilization patterns and increasing costs** suggests that utilization volume alone does not fully explain healthcare spending. Among older beneficiaries, increasing clinical complexity and intensity of care may contribute to higher costs even when the number of distinct service types remains similar.
+
+This finding motivates the later analysis of chronic conditions and high-cost beneficiaries.
+
+## #2: Who Are the High-Cost Beneficiaries?
+
+To identify high-cost beneficiaries, payer and patient out-of-pocket (OOP) costs were examined separately. Because healthcare spending varies substantially by year, the high-cost threshold was defined independently for each year using the **top 10% of annual spending**.
+
+| Year | Top 10% Payer Cost Cutoff | Top 10% OOP Cost Cutoff |
+| ---- | ------------------------: | ----------------------: |
+| 2008 |                   $12,520 |                  $2,544 |
+| 2009 |                   $13,530 |                  $2,578 |
+| 2010 |                    $7,340 |                  $1,590 |
+
+This approach avoids applying a single dollar threshold across years with different spending distributions and allows high-cost beneficiaries to be identified relative to their contemporaneous population.
+
+### ESRD Is Strongly Associated With High Healthcare Costs
+
+ESRD represents approximately **7.86% of patient-year records**, yet it is disproportionately represented among high-cost beneficiaries.
+<img width="645" height="182" alt="Screenshot 2026-08-15 at 1 58 39 PM" src="https://github.com/user-attachments/assets/aabf314d-4cd3-4403-9f69-f2739e085084" />
+
+Among patient-year records classified as high payer-cost (not shown on the visualization but available at 2_eda_and_feature_engineering.ipynb):
+
+* **72.7%** are non-ESRD
+* **27.3%** are ESRD
+
+Among high OOP-cost patient-year records:
+
+* **71.37%** are non-ESRD
+* **28.63%** are ESRD
+
+The contrast becomes even more apparent when examining average costs and utilization: **ESRD beneficiaries have approximately three times the average payer cost and OOP cost of non-ESRD beneficiaries**, alongside higher healthcare utilization.
+
+From a payer strategy perspective, this makes ESRD an important clinical indicator for identifying populations with disproportionately high resource utilization and financial burden.
+
+### The 2010 Cost Decline Requires Further Investigation
+
+One of the most notable patterns is a sharp decline in observed costs in 2010 for the same cohort of approximately **110,898 beneficiaries**.
+
+This finding should be treated as an **observation rather than a causal conclusion**. Several explanations are possible, including changes in utilization, claims patterns, reimbursement, coding, or the composition of services captured in the dataset.
+
+External Medicare research provides some useful context. The Commonwealth Fund found that Medicare spending growth slowed during this broader period and attributed reductions to a combination of changes in chronic-condition spending, service utilization, and evolving approaches to care delivery and payment. Cardiovascular disease spending, in particular, declined substantially during the 2007–2010 to 2011–2014 comparison period.
+
+However, because this project uses a specific **DE-SynPUF sample and only covers 2008–2010**, the observed 2010 decline cannot be attributed directly to the Affordable Care Act or to changes in heart attack and stroke prevalence without additional analysis. The decline should therefore be considered a finding that warrants further investigation rather than evidence of a specific policy effect.
+
+
