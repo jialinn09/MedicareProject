@@ -260,6 +260,7 @@ This approach avoids applying a single dollar threshold across years with differ
 ### ESRD Is Strongly Associated With High Healthcare Costs
 
 ESRD represents approximately **7.86% of patient-year records**, yet it is disproportionately represented among high-cost beneficiaries.
+
 <img width="645" height="182" alt="Screenshot 2026-08-15 at 1 58 39 PM" src="https://github.com/user-attachments/assets/aabf314d-4cd3-4403-9f69-f2739e085084" />
 
 Among patient-year records classified as high payer-cost (not shown on the visualization but available at 2_eda_and_feature_engineering.ipynb):
@@ -285,5 +286,55 @@ This finding should be treated as an **observation rather than a causal conclusi
 External Medicare research provides some useful context. The Commonwealth Fund found that Medicare spending growth slowed during this broader period and attributed reductions to a combination of changes in chronic-condition spending, service utilization, and evolving approaches to care delivery and payment. Cardiovascular disease spending, in particular, declined substantially during the 2007–2010 to 2011–2014 comparison period.
 
 However, because this project uses a specific **DE-SynPUF sample and only covers 2008–2010**, the observed 2010 decline cannot be attributed directly to the Affordable Care Act or to changes in heart attack and stroke prevalence without additional analysis. The decline should therefore be considered a finding that warrants further investigation rather than evidence of a specific policy effect.
+
+### Cost-Burden Profiles Across Population Subgroups
+
+To further characterize high-cost populations, patient-year records were grouped into four cost-burden profiles based on the prevalence of high payer spending and high out-of-pocket (OOP) spending within each demographic subgroup. A subgroup was classified as having **high prevalence** when more than 10% of its patient-year records fell within the corresponding high-cost category.
+
+This creates four cost-burden profiles:
+
+| Cost-burden profile                      | Interpretation                                                            | Population subgroups                                                 |
+| ---------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 🟧 High OOP burden, lower payer spending | High prevalence of high OOP cost, but lower prevalence of high payer cost | Hispanic females 75–84; Hispanic males 85–94                         |
+| 🟨 High payer spending, lower OOP burden | High prevalence of high payer cost, but lower prevalence of high OOP cost | Black males 95+                                                      |
+| 🟥 High prevalence of both               | High prevalence of both high payer and high OOP costs                     | Females 85–94 and <65; non-Hispanic males 85–94; non-Black males 95+ |
+| 🟩 Low prevalence of both                | Lower prevalence of both high payer and high OOP costs                    | Ages 65–74 across demographic groups                                 |
+
+<img width="764" height="540" alt="Screenshot 2026-08-15 at 9 37 55 PM" src="https://github.com/user-attachments/assets/28fb81a0-9d73-4067-8596-61a53dc86d9e" />
+
+The concentration of the **high-burden-both** profile among females aged 85–94 and <65, as well as males aged 85–94 and 95+, suggests that certain age groups experience substantial financial burden from both the payer and patient perspectives.
+
+The high-burden profiles also show some consistency with utilization patterns observed earlier. For example, the Black male 95+ subgroup in the high-payer/low-OOP profile and the non-Black male 95+ subgroup in the high-both profile both exhibit relatively low average distinct service-type utilization. This suggests that **the number of distinct service types alone may not adequately capture cost intensity**. A beneficiary may interact with fewer types of services while still generating substantially higher costs.
+
+Similarly, the low-burden-both profile is concentrated among beneficiaries aged 65–74, which is consistent with the relatively lower service-type utilization observed in some of these populations earlier in the analysis.
+
+### Cost Composition by Cost-Burden Profile
+
+Breaking total costs down by service type reveals that different high-cost populations may experience different mechanisms of financial burden.
+
+**Inpatient costs** are highest among populations with a high prevalence of both payer and OOP spending, followed by populations with high payer spending but lower OOP burden. The same pattern is observed for **outpatient payer costs**.
+
+<img width="764" height="546" alt="ip insurance" src="https://github.com/user-attachments/assets/54139a1e-76b4-4882-852b-93662920bc01" />
+
+This suggests that inpatient and outpatient services are major contributors to the high payer spending observed among the highest-burden populations.
+
+**Carrier payer costs** show a similar pattern, with the high-burden-both group having the highest average cost. However, the high-OOP/lower-payer group and low-burden-both group are nearly tied for the second-highest carrier costs.
+
+<img width="764" height="546" alt="carrier insurance" src="https://github.com/user-attachments/assets/df8f3ae0-94af-4c31-ab95-c6b21421ad8a" />
+
+The pattern differs for **prescription drug (PDE) payer costs**. The high-OOP/lower-payer group has the highest average prescription drug payer cost, exceeding the high-burden-both group by approximately $500.
+
+<img width="764" height="546" alt="pde insurance" src="https://github.com/user-attachments/assets/0ff15251-791f-4fc9-ac55-da2ba70a2f57" />
+
+This divergence is particularly notable because the high-OOP/lower-payer group is defined by substantial patient financial burden despite relatively lower prevalence of high payer spending. One possible explanation is **higher prescription drug utilization or greater patient cost-sharing**, where prescription-related expenses contribute disproportionately to patient OOP burden relative to other service categories. Additional analysis of prescription volume, drug spending, and patient cost-sharing would be needed to distinguish between these mechanisms.
+
+### Key Takeaway
+
+High-cost Medicare beneficiaries are not a homogeneous population. Different demographic groups can arrive at high overall healthcare costs through **different combinations of payer spending and patient financial burden**.
+
+The high-burden-both populations represent the most consistently expensive profile across inpatient, outpatient, and carrier services, while the high-OOP/lower-payer profile stands out for its relatively high prescription drug costs.
+
+For payer strategy, this distinction matters because **intervention strategies may need to differ depending on whether the primary burden comes from high medical utilization, prescription drug spending, patient cost-sharing, or a combination of these factors.**
+
 
 
