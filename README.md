@@ -336,5 +336,33 @@ The high-burden-both populations represent the most consistently expensive profi
 
 For payer strategy, this distinction matters because **intervention strategies may need to differ depending on whether the primary burden comes from high medical utilization, prescription drug spending, patient cost-sharing, or a combination of these factors.**
 
+### Utilization vs. Cost
+
+Examining utilization alongside payer costs reveals different relationships across service types.
+
+For **inpatient services**, utilization follows the expected pattern: the high-prevalence-of-both group has the highest average utilization, followed by the high-payer-spending/lower-OOP group. Overall, higher inpatient utilization is associated with higher payer costs. However, the difference in average utilization between the two highest-utilization groups is relatively small, while their average payer cost burden differs by approximately **$300**. This suggests that utilization volume alone may not fully explain inpatient cost differences and warrants further investigation into differences in service intensity and claim composition.
+
+<img width="590" height="546" alt="IP util" src="https://github.com/user-attachments/assets/21298c89-5f48-4e7c-8f25-475e93b66d2e" />
+
+The relationship is less consistent for **outpatient services**. Average outpatient payer costs follow the expected descending order:
+
+**High prevalence of both → High payer spending/lower OOP → High OOP/lower payer → Low prevalence of both.**
+
+However, the utilization ranking does not follow the same pattern. The high-OOP/lower-payer and low-burden-both groups exhibit higher average outpatient utilization than the high-payer/lower-OOP group despite having lower average payer costs.
+
+<img width="590" height="546" alt="OP util" src="https://github.com/user-attachments/assets/4fce10ba-9a30-4e4e-a4cd-2ad1843289d2" />
+
+This divergence suggests that **outpatient utilization volume is not a sufficient proxy for outpatient payer burden**. Some groups may have more outpatient encounters but lower-cost encounters, while others may have fewer encounters with substantially higher costs per encounter.
+
+This makes outpatient claims particularly interesting for further analysis. A useful next step would be to examine **payer cost per utilization event**, as well as the underlying procedure, provider, or service mix, to determine whether differences in cost intensity explain the observed divergence.
+
+In contrast, **carrier utilization and payer cost show a much more direct relationship**: groups with higher average carrier utilization also exhibit higher carrier payer costs. The same pattern is observed for **prescription drug (PDE) utilization**, where higher prescription utilization corresponds with higher payer spending.
+
+<img width="590" height="546" alt="carrier util" src="https://github.com/user-attachments/assets/ee413c73-651b-4b66-991a-1b471eabaf3a" />
+<img width="590" height="546" alt="pde util" src="https://github.com/user-attachments/assets/d6017098-b70b-4a6a-876a-6ac1b2f9e69f" />
+
+Overall, these results suggest that the relationship between utilization and cost is **service-specific**. Carrier and prescription drug costs appear more closely tied to utilization volume, whereas outpatient costs may depend more heavily on the intensity and composition of individual encounters.
+
+
 
 
