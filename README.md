@@ -363,6 +363,46 @@ In contrast, **carrier utilization and payer cost show a much more direct relati
 
 Overall, these results suggest that the relationship between utilization and cost is **service-specific**. Carrier and prescription drug costs appear more closely tied to utilization volume, whereas outpatient costs may depend more heavily on the intensity and composition of individual encounters.
 
+### Disease Burden and Cost-Burden Profiles
+
+The relationship between clinical disease burden and cost-burden profiles was examined across six major disease categories: **diabetes, cancer, chronic kidney disease (CKD), chronic obstructive pulmonary disease (COPD), end-stage renal disease (ESRD), and heart failure**.
+
+Although the exact prevalence varies by disease, a remarkably consistent pattern emerges across all six conditions:
+
+**High prevalence of both payer and OOP burden → High OOP burden/lower payer burden → Low prevalence of both → High payer burden/lower OOP burden.**
+
+In other words, the populations experiencing high patient out-of-pocket burden consistently show higher prevalence of chronic and serious diseases than populations characterized primarily by high payer spending.
+
+### COPD as an Illustrative Example
+
+<img width="478" height="546" alt="Screenshot 2026-08-16 at 11 39 10 AM" src="https://github.com/user-attachments/assets/d38e070e-6733-4811-89c8-8764bc61b987" />
+
+COPD demonstrates this pattern clearly. The high-burden-both population has the highest disease prevalence, followed by the high-OOP/lower-payer population. The low-burden-both population has lower prevalence, while the high-payer/lower-OOP population consistently exhibits the lowest disease prevalence.
+
+The same ordering is observed across diabetes, cancer, CKD, ESRD, and heart failure, suggesting that this is not isolated to a single disease category.
+
+### Key Insight
+
+The consistency of this pattern suggests that **clinical disease burden may be more closely associated with patient OOP burden than with payer-only cost burden** within this dataset.
+
+One potential explanation is that patients with chronic or complex conditions may require sustained treatment across multiple services, resulting in recurring patient cost-sharing even when individual claims are not necessarily among the highest payer-cost claims. However, the current analysis cannot determine whether disease burden itself drives OOP spending or whether the relationship is mediated by utilization, treatment intensity, service mix, or cost-sharing structure.
+
+This distinction is particularly important because it suggests that **high payer spending and high patient financial burden may represent different risk phenotypes**. A population with high payer spending but relatively low disease prevalence may be driven by a smaller number of high-intensity services, whereas populations with substantial chronic disease burden may experience more persistent healthcare needs and associated OOP expenses.
+
+### Future Analysis
+
+A natural next step is to connect disease prevalence with **claim utilization and claim intensity**. For example, future analysis could examine:
+
+* Number of inpatient, outpatient, carrier, and prescription drug claims by disease
+* Average and total utilization among beneficiaries with each condition
+* Payer cost and OOP cost per utilization event
+* Number of chronic conditions per patient-year
+* Service-type combinations associated with specific diseases
+* Whether disease-specific utilization predicts high OOP burden after accounting for age and other demographic characteristics
+
+This would help distinguish between two potential mechanisms: **high OOP burden resulting from frequent, sustained healthcare utilization** versus **high OOP burden resulting from a smaller number of high-intensity services**.
+
+More broadly, this analysis reinforces the finding that **high healthcare spending is not a single phenotype**. Clinical complexity, utilization intensity, payer spending, and patient financial burden may interact in different ways across beneficiary populations.
 
 
 
