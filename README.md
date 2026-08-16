@@ -404,5 +404,143 @@ This would help distinguish between two potential mechanisms: **high OOP burden 
 
 More broadly, this analysis reinforces the finding that **high healthcare spending is not a single phenotype**. Clinical complexity, utilization intensity, payer spending, and patient financial burden may interact in different ways across beneficiary populations.
 
+# #3: Can We Identify Future High-Cost Beneficiaries?
+
+The final modeling question asks whether beneficiary characteristics, historical utilization, disease burden, and prior spending can be used to identify beneficiaries at elevated risk of becoming high-cost.
+
+To preserve the temporal structure of the analysis:
+
+* **2008:** Predictions use baseline beneficiary demographics and ESRD information.
+* **2009:** Predictions incorporate 2008 historical information alongside beneficiary characteristics.
+* **2010:** Predictions incorporate cumulative information from **2008 and 2009**, allowing the models to leverage a longer history of beneficiary utilization, disease burden, and spending.
+
+High-cost outcomes were defined independently within each year using the top 10% of annual payer spending and OOP burden:
+
+| Year | High Payer Cost Prevalence | High OOP Burden Prevalence |
+| ---- | -------------------------: | -------------------------: |
+| 2008 |                      9.99% |                      9.98% |
+| 2009 |                      9.99% |                      9.97% |
+| 2010 |                      9.99% |                     10.00% |
+
+The near-10% prevalence across all outcomes is expected because high-cost beneficiaries were defined using annual top-decile thresholds.
+
+## Model Comparison
+
+Three classification approaches were evaluated: **logistic regression, random forest, and XGBoost**.
+
+### Logistic Regression: High-Recall Screening
+
+Logistic regression was configured with balanced class weighting to account for the relatively rare high-cost outcomes. This produced a model that prioritizes sensitivity to the positive class, accepting more false positives in exchange for capturing more actual high-cost beneficiaries.
+
+| Target               | ROC-AUC | Precision | Recall |
+| -------------------- | ------: | --------: | -----: |
+| High Payer Cost 2008 |    0.66 |      0.25 |   0.37 |
+| High OOP Burden 2008 |    0.67 |      0.27 |   0.38 |
+| High Payer Cost 2009 |    0.83 |      0.24 |   0.75 |
+| High OOP Burden 2009 |    0.89 |      0.32 |   0.83 |
+| High Payer Cost 2010 |    0.77 |      0.19 |   0.72 |
+| High OOP Burden 2010 |    0.81 |      0.22 |   0.77 |
+
+Performance improved substantially when historical information became available. In particular, the 2009 and 2010 models achieved substantially higher recall than the 2008 baseline models, suggesting that prior beneficiary information provides useful predictive signal for future high-cost outcomes.
+
+The tradeoff is relatively low precision, meaning that many beneficiaries flagged by the model would not ultimately fall within the top-cost group. This makes logistic regression more appropriate for **broad, low-cost screening or risk review** than for highly selective interventions.
+
+### Random Forest: Intermediate Precision-Recall Tradeoff
+
+Random forest was evaluated as a nonlinear benchmark and generally produced an intermediate tradeoff between precision and recall.
+
+| Target               | ROC-AUC | Precision | Recall |
+| -------------------- | ------: | --------: | -----: |
+| High Payer Cost 2008 |    0.69 |      0.22 |   0.43 |
+| High OOP Burden 2008 |    0.70 |      0.24 |   0.46 |
+| High Payer Cost 2009 |    0.83 |      0.37 |   0.49 |
+| High OOP Burden 2009 |    0.90 |      0.43 |   0.68 |
+| High Payer Cost 2010 |    0.79 |      0.32 |   0.38 |
+| High OOP Burden 2010 |    0.82 |      0.31 |   0.48 |
+
+The random forest models generally improved precision relative to logistic regression while sacrificing some recall. This provides a useful middle ground when the cost of false positives becomes more important.
+
+### XGBoost: Strongest Discriminative Performance
+
+XGBoost achieved the strongest or near-strongest ROC-AUC across the majority of targets and was therefore selected for detailed SHAP-based interpretation.
+
+| Target               | ROC-AUC | Precision | Recall |
+| -------------------- | ------: | --------: | -----: |
+| High Payer Cost 2008 |    0.69 |      0.48 |   0.03 |
+| High OOP Burden 2008 |    0.71 |      0.61 |   0.03 |
+| High Payer Cost 2009 |    0.84 |      0.75 |   0.15 |
+| High OOP Burden 2009 |    0.90 |      0.67 |   0.33 |
+| High Payer Cost 2010 |    0.79 |      0.75 |   0.07 |
+| High OOP Burden 2010 |    0.83 |      0.68 |   0.08 |
+
+XGBoost demonstrates a markedly different operating point from logistic regression. Its high precision indicates that predictions classified as positive tend to be relatively high-confidence, but its low recall means that the model identifies only a small fraction of the eventual high-cost population at the selected classification threshold.
+
+This illustrates an important distinction: **strong discriminative performance does not necessarily translate into high-recall targeting at a fixed classification threshold.**
+
+## What Drives High-Cost Predictions?
+
+<img width="1055" height="592" alt="Screenshot 2026-08-16 at 12 47 45 PM" src="https://github.com/user-attachments/assets/448bc00d-749c-4175-8075-d9fcc1cef112" />
+
+Feature-family analysis across models consistently identified **historical cost, utilization, disease burden, chronic condition burden, and demographic characteristics** as important sources of predictive information.
+
+XGBoost SHAP analysis provided a more granular view of the individual features driving predictions. The strongest contributors included:
+
+* Number of carrier (Part B) claims
+* Total carrier payer expenditures
+* Number of outpatient claims
+* Prescription drug expenditures
+* Outpatient payer expenditures
+
+An example result from high OOP burden for 2009 XGB model SHAP is included below:
+
+<img width="674" height="701" alt="Screenshot 2026-08-16 at 12 49 01 PM" src="https://github.com/user-attachments/assets/a7694d43-376c-4612-b87e-32fe8f29eb63" />
+
+These findings reinforce several patterns identified during EDA.
+
+First, the strong contribution of carrier utilization and prescription drug expenditures is consistent with the earlier finding that **carrier and prescription drug utilization have relatively direct relationships with payer costs**.
+
+Second, outpatient claim count shows nonlinear effects in the XGBoost model. This is consistent with the earlier EDA finding that **outpatient utilization does not map proportionally to payer cost**. The same number of outpatient claims may therefore correspond to substantially different levels of future cost depending on the beneficiary's broader clinical and utilization profile.
+
+### Clinical and Coverage Indicators
+
+**ESRD** consistently emerged as an important clinical indicator of high-cost risk, reinforcing the EDA finding that ESRD beneficiaries experience substantially higher payer and OOP costs.
+
+Partial-year Medicare coverage was also associated with higher predicted future cost. Possible explanations include new enrollment, coverage transitions, or other differences in beneficiary circumstances. Because the current analysis cannot distinguish among these mechanisms, this finding should be treated as a hypothesis for further investigation rather than a causal relationship.
+
+## Risk Stratification
+
+Beyond binary classification, predicted probabilities were used to rank beneficiaries into five equally sized risk groups:
+
+* **Q1:** Lowest 20% predicted risk
+* **Q2:** 20–40%
+* **Q3:** 40–60%
+* **Q4:** 60–80%
+* **Q5:** Highest 20%
+
+Risk stratification demonstrated **meaningful separation** across the models: quintile sizes were balanced, and observed event rates increased monotonically from Q1 to Q5.
+
+For example, in the 2008 High OOP Burden model, the observed event rate increased from **5.3% in Q1 to 21.4% in Q5**, representing a **4.04-fold difference**. Mean predicted probability increased from 30.4% to 64.0% across the same groups.
+
+<img width="860" height="153" alt="Screenshot 2026-08-16 at 12 46 18 PM" src="https://github.com/user-attachments/assets/7a82a8d8-1dca-453d-a223-25fdf604b383" />
+
+Similar monotonic patterns were observed across the year-outcome models, indicating that the models can meaningfully **rank beneficiaries according to relative risk**, even when binary classification performance is more limited.
+
+When the highest-risk quintile was treated as the intervention population, it achieved **25.5% precision and 51.1% recall**. In other words, targeting the top 20% of predicted-risk beneficiaries captured approximately half of the actual high-cost population, while approximately one in four targeted beneficiaries ultimately belonged to the high-cost group.
+
+This represents meaningful risk concentration, but also demonstrates the limitations of highly selective targeting: **a substantial proportion of high-cost beneficiaries remain outside the highest-risk quintile**.
+
+For a payer with relatively low-cost screening or review resources, this risk stratification approach could still provide value by prioritizing beneficiaries for additional assessment. However, more resource-intensive interventions would likely require additional predictors or more targeted thresholds to improve precision.
+
+## Overall Modeling Takeaway
+
+The models demonstrate that **future high-cost risk is partially predictable from beneficiary characteristics, prior utilization, spending, and clinical burden**, particularly when historical information is available.
+
+The results also reveal an important distinction between **risk ranking and high-confidence classification**. XGBoost provides strong discriminative performance and enables detailed feature-level interpretation, while logistic regression provides substantially higher recall at the selected operating point and is therefore better aligned with a broad screening strategy.
+
+More broadly, the modeling results reinforce the central finding from the EDA:
+
+> **High-cost healthcare utilization is driven by a combination of clinical complexity, historical utilization, and spending patterns rather than by utilization volume alone.**
+
+The findings support the potential use of claims-based risk stratification as a first-stage screening tool, while also highlighting the need for richer longitudinal information and more detailed service-intensity features to improve precision and support higher-stakes intervention targeting.
 
 
