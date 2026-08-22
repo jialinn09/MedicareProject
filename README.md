@@ -1,100 +1,106 @@
 # Predicting High-Cost Medicare Patients
 
-**[→ Interactive Tableau Dashboard](https://public.tableau.com/app/profile/jialin.jiang4317/viz/MedicareAnalysis_17861454891190/MedicarePopulationOverview)** · **[→ Full Analysis Write-Up](./ANALYSIS.md)**
+**[→ Interactive Tableau Dashboard](https://public.tableau.com/app/profile/jialin.jiang4317/viz/MedicareAnalysis_17861454891190/MedicarePopulationOverview)** · **[→ Full Analysis Write-Up](./ANALYSIS.md)** · **[→ Methodology](./METHODS.md)**
 
-## Executive Summary
+**Objective:** Identify future high-cost Medicare beneficiaries and characterize patterns associated with healthcare utilization and financial burden to inform payer intervention strategies.  
+**Data:** CMS DE-SynPUF (2008–2010) Sample 9 | 332,694 patient-year records | 110,898 unique beneficiaries  
+**Tools:** Python (3.13.5), Scikit-Learn (1.6.1), XGBoost (3.1.2), SHAP (0.52.0), Tableau Public
 
-This project uses the CMS DE-SynPUF 2008–2010 Medicare claims dataset to investigate healthcare utilization, cost burden, and future high-cost risk among Medicare beneficiaries. The analysis spans data cleaning, patient-year feature engineering, exploratory analysis, predictive modeling, model explainability, and risk stratification — extending a capstone proposal from CPH 100: Foundations for Computational Precision Health at UC Berkeley.
+---
 
-Three major findings emerged:
+## Executive Summary: Why This Matters
 
-1. **Healthcare utilization does not translate directly into cost.** Carrier and prescription drug utilization tracked payer spending fairly directly, but outpatient utilization did not — suggesting service intensity and composition matter more than encounter volume alone, particularly for outpatient care.
-2. **High-cost beneficiaries represent distinct financial-burden profiles.** Populations with high prevalence of both payer spending and OOP burden consistently showed the greatest disease burden and cost across service categories, while populations with high OOP burden but lower payer spending stood out for prescription drug costs specifically — high payer spending and high patient burden appear to be overlapping but distinct risk phenotypes.
-3. **Future high-cost risk is partially predictable from historical claims.** Model performance improved substantially once historical utilization/spending became available (best ROC-AUC: 0.90), but the models were better at *ranking relative risk* than *selectively identifying* all future high-cost beneficiaries — a meaningful limitation for highly targeted intervention.
+*   **For Health Analytics:** Healthcare utilization *volume* does not directly translate to *cost*. Outpatient care intensity and composition matter far more than simple encounter counts. Additionally, ESRD is a major clinical indicator for disproportionate medical costs.
+*   **For Payer Strategy:** High-cost beneficiaries have distinct risk phenotypes. The "high payer + high OOP (out-of-pocket)" subpopulation drives inpatient/outpatient costs. Meanwhile, the "high OOP/low payer burden" group is uniquely driven by prescription drug cost-sharing.
+*   **For Predictive Modeling:** Historical utilization substantially improves prediction of future high-cost beneficiaries, with models achieving up to **0.90 ROC-AUC** on held-out test data. Risk stratification into quintiles captured **51.1% of future high-cost beneficiaries** (51.1% recall) by targeting the top 20% predicted-risk population.
 
-Model explainability further showed that prior utilization and spending — particularly carrier claims, carrier expenditures, outpatient claims, and prescription drug expenditures — were among the strongest predictors of future high-cost status, alongside ESRD status.
-
-Overall, claims-based analytics here supports **population-level risk stratification and early screening**, but more detailed longitudinal utilization and service-intensity features would likely be needed for high-precision intervention targeting.
-
-## Project Background
-
-The original proposal aimed to use the SyH-DR 2016 All-Payer Claims Dataset, but access restrictions made it impractical for a course-based project — a common bottleneck in healthcare analytics. The project was re-scoped around CMS DE-SynPUF, which preserves the structure of real Medicare claims data while being publicly accessible and reproducible.
-
-**Dataset:** CMS DE-SynPUF (Beneficiary, Carrier, Inpatient, Outpatient, PDE) · Cohort restricted to beneficiaries with records spanning 2008–2010 · 332,694 patient-year records across 110,898 unique beneficiaries
-
+---
 ## Key Findings
 
-### 1. Healthcare utilization does not translate directly into cost
+**1. Demographic Representation & Limitations** 
 
-Across age groups, beneficiaries interacted with broadly similar types of healthcare services, yet payer costs increased substantially with age, peaking at 85–94 for inpatient and carrier costs. The utilization-cost relationship also differed by service type: carrier and prescription drug utilization tracked payer spending fairly directly, while outpatient utilization volume did not consistently correspond to cost — suggesting claim intensity and composition matter more than encounter volume, particularly for outpatient care.
+<img width="786" height="330" alt="Screenshot 2026-08-15 at 1 55 11 PM" src="https://github.com/user-attachments/assets/c4a9fa06-3c88-4df3-a182-f2670ecfaf83" />
 
-> **Deep dive:** [Cost by Age](./ANALYSIS.md#cost-by-age) · [Utilization vs. Cost](./ANALYSIS.md#utilization-vs-cost)
+*The dataset is disproportionately represented by White beneficiaries and women (55.57% of records); White beneficiaries comprise ~83% of both female and male records. Given the sample's demographic skew, we did not have sufficient subgroup sample size to validate whether risk-phenotype patterns generalize across race; this is a priority for future work with a more representative dataset.*
 
-### 2. High-cost beneficiaries exhibit distinct cost-burden profiles
+**2. Distinct Cost-Burden Phenotypes**  
+| Profile | Interpretation | Example subgroups |
+|---|---|---|
+| 🟧 High OOP burden, lower payer spending | High OOP prevalence, lower payer prevalence | Hispanic females 75–84; Hispanic males 85–94 |
+| 🟨 High payer spending, lower OOP burden | High payer prevalence, lower OOP prevalence | Black males 95+ |
+| 🟥 High prevalence of both | High prevalence of both | Females 85–94 and <65; non-Hispanic males 85–94; non-Black males 95+ |
+| 🟩 Low prevalence of both | Low prevalence of both | Ages 65–74 across demographic groups |
 
-High-cost status was defined independently per year using the 90th percentile of payer and OOP spending. Four cost-burden profiles emerged — high-both, high-OOP/lower-payer, high-payer/lower-OOP, and low-both. The **high-burden-both** populations consistently showed the greatest disease burden and were among the highest-cost across inpatient, outpatient, and carrier services. The **high-OOP/lower-payer** group stood out for relatively high prescription drug spending, suggesting patient financial burden can arise through different mechanisms than payer spending.
+<img width="764" height="540" alt="Screenshot 2026-08-15 at 9 37 55 PM" src="https://github.com/user-attachments/assets/28fb81a0-9d73-4067-8596-61a53dc86d9e" />
 
-> **Deep dive:** [Cost-Burden Profiles Across Population Subgroups](./ANALYSIS.md#cost-burden-profiles-across-population-subgroups) · [Cost Composition by Cost-Burden Profile](./ANALYSIS.md#cost-composition-by-cost-burden-profile)
+*Distinct service-type count alone does not capture cost intensity: some of the highest-cost subgroups, including Black males 95+ and non-Black males 95+, show relatively low average service-type utilization despite high financial burden.*
 
-### 3. Disease burden is particularly associated with OOP burden
+**3. The Outpatient Utilization Paradox**  
 
-Across diabetes, cancer, CKD, COPD, ESRD, and heart failure, disease prevalence followed a consistent ordering: **high-burden-both → high-OOP/lower-payer → low-burden-both → high-payer/lower-OOP** — suggesting clinical complexity and patient financial burden are closely related, though causality can't be established from this data. ESRD was particularly notable: ~7.86% of patient-year records, but ~27% of high payer-cost and high OOP-cost records, with ~3x the average cost of non-ESRD beneficiaries.
+<img width="590" height="546" alt="OP util" src="https://github.com/user-attachments/assets/4fce10ba-9a30-4e4e-a4cd-2ad1843289d2" />
 
-> **Deep dive:** [Disease Burden and Cost-Burden Profiles](./ANALYSIS.md#disease-burden-and-cost-burden-profiles) · [ESRD Is Strongly Associated With High Healthcare Costs](./ANALYSIS.md#esrd-is-strongly-associated-with-high-healthcare-costs)
+*The high-OOP/lower-payer and low-burden-both groups show higher outpatient utilization than the high-payer/lower-OOP group despite having lower payer costs. This suggests outpatient cost depends more on encounter intensity and procedure composition than on raw visit volumes.*
 
-### 4. Future high-cost risk is partially predictable
+**4. Disease Burden Aligns with OOP Burden**  
 
-| Model | Primary strength | Best ROC-AUC |
-|---|---|---:|
-| Logistic Regression | High recall / interpretable screening | 0.89 |
-| Random Forest | Precision-recall middle ground | 0.90 |
-| XGBoost | Discrimination + nonlinear interpretation | 0.90 |
+<img width="478" height="546" alt="Screenshot 2026-08-16 at 11 39 10 AM" src="https://github.com/user-attachments/assets/d38e070e-6733-4811-89c8-8764bc61b987" />
 
-The strongest performance occurred once historical claims became available — 2009 High OOP Burden models reached ROC-AUC 0.89–0.90, versus ~0.67–0.71 for the 2008 baseline. Operating points differed by objective: logistic regression favored recall (broad screening), random forest offered a middle ground, and XGBoost achieved strong discrimination and high precision but captured fewer actual high-cost beneficiaries at its default threshold.
+*Across six chronic conditions (diabetes, cancer, CKD, COPD, ESRD, heart failure), a consistent ordering emerges: High-burden-both → High OOP/lower payer → Low burden-both → High payer/lower OOP. Clinical disease burden appears more closely associated with patient OOP burden than with payer-only cost burden. This suggests high payer spending and high OOP burden may represent different risk phenotypes.*
 
-> **Deep dive:** [Model Comparison](./ANALYSIS.md#model-comparison)
+**[→ Explore the full interactive Medicare Analysis Dashboard on Tableau Public](https://public.tableau.com/app/profile/jialin.jiang4317/viz/MedicareAnalysis_17861454891190/MedicarePopulationOverview)**
 
-### 5. Historical utilization is one of the strongest predictors
-
-SHAP analysis of XGBoost identified the strongest predictors of future high-cost status: number of carrier claims, carrier payer expenditures, number of outpatient claims, prescription drug expenditures, outpatient payer expenditures, ESRD status, and partial-year Medicare coverage. The nonlinear relationship between outpatient claim count and predicted risk reinforces the earlier finding that outpatient utilization doesn't map proportionally to cost.
-
-> **Deep dive:** [What Drives High-Cost Predictions?](./ANALYSIS.md#what-drives-high-cost-predictions)
-
-## Risk Stratification
-
-Beneficiaries were ranked into five equal-sized predicted-risk quintiles rather than relying solely on binary classification. Observed event rates increased monotonically from Q1 to Q5 across models — e.g., the 2008 High OOP Burden model rose from 5.3% (Q1) to 21.4% (Q5), a 4.04x ratio. Treating the top quintile as an intervention population achieved ~25.5% precision and 51.1% recall — capturing about half of actual high-cost beneficiaries while targeting only 20% of the population. This indicates the models are more effective for relative risk ranking and low-cost screening than for highly selective intervention targeting.
-
-> **Deep dive:** [Risk Stratification](./ANALYSIS.md#risk-stratification)
-
-## Interactive Dashboard
-
-**[View the Medicare Analysis Dashboard on Tableau Public](https://public.tableau.com/app/profile/jialin.jiang4317/viz/MedicareAnalysis_17861454891190/MedicarePopulationOverview)**
-
-- **Medicare Population Overview** — demographics, spending patterns, service utilization, geographic variation
-- **Beneficiary Cost-Burden Segmentation** — high payer spending, high OOP burden, cost composition, utilization, demographic differences
+---
 
 ## Repository Structure
 
-| Notebook | Focus |
-|---|---|
-| `0_data_loading.ipynb` | Source data loading |
-| `1_data_cleaning.ipynb` | Data auditing, cleaning, validation, feature engineering |
-| `2_eda_and_feature_engineering.ipynb` | Population, utilization, cost, disease burden |
-| `3_modeling.ipynb` | Logistic regression, random forest, XGBoost |
-| `4_analyzing.ipynb` | Feature importance, SHAP, risk stratification |
+*   `code_mapping/`: Reference for mapping ICD-9 codes into distinct disease categories.
+*   `src/`: Modular, reusable Python functions for data cleaning, feature engineering, modeling, and SHAP analysis.
+*   `results/`: Generated outputs, including SHAP summary/dependence plots, model evaluation metrics, feature importance, and risk stratification tables (patient-level and quintile-level).
+*   `notebooks/`: All Jupyter notebooks to run within this project.
+    *   `0_data_loading.ipynb`: Source data ingestion.
+    *   `1_data_cleaning.ipynb`: Auditing, validation, and feature engineering.
+    *   `2_eda_and_feature_engineering.ipynb`: Population, utilization, and disease burden analysis.
+    *   `3_modeling.ipynb`: Logistic Regression, Random Forest, and XGBoost training.
+    *   `4_analyzing.ipynb`: SHAP feature importance and risk stratification.
+*   `requirements.txt`: Contains the dependencies for this project.
+*   `ANALYSIS.md`: Full, detailed write-up of findings from the project.
+*   `METHODS.md`: Deep dive into methodology, design choices, and validation strategies.
+
+---
 
 ## Dataset & Limitations
 
-- The dataset is **synthetic** (CMS DE-SynPUF) and does not represent actual individual beneficiaries
-- Covers **2008–2010** — spending patterns and the healthcare environment are historical
-- Cohort is restricted to beneficiaries with records spanning all three years
-- High-cost thresholds are defined relative to the annual sample, not universal clinical/financial thresholds
-- Demographic representation is imbalanced, particularly across racial and ethnic groups (see [Population Demographics](./ANALYSIS.md#population-demographics))
-- Predictive associations should not be interpreted as causal
-- The observed 2010 spending decline requires further investigation and shouldn't be attributed to a specific policy based on this analysis alone
+*   **Synthetic Data:** Uses CMS DE-SynPUF; patterns are structurally accurate but do not represent real individuals.
+*   **Historical Context:** Covers 2008–2010; healthcare spending dynamics have evolved since.
+*   **Correlation ≠ Causation:** Predictive associations identify risk markers, not causal drivers.
+*   **Relative Thresholds:** High-cost thresholds are relative to the annual sample distribution, not universal clinical benchmarks.
 
-## Software Environment
+*View the Full Analysis in [ANALYSIS.md](ANALYSIS.md)*
 
-Python 3.13.5 · Scikit-learn 1.6.1 · XGBoost 3.1.2 · Tableau
+---
+## Reproducibility & Setup
 
+This project is fully reproducible and engineered for frictionless execution. The core logic is modularized in the `src/` directory, and the pipeline automatically generates the `results/` directory and saves all outputs in the correct locations—no manual folder setup required. Outputs are deterministic (random seed = 42).
 
+> **Note:** Due to file size and data governance best practices, the raw CMS DE-SynPUF dataset is not committed to this repository. Follow the steps below to set up the data locally.
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/jialinn09/MedicareProject.git
+   cd MedicareProject
+
+2. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   
+3. **Acquire the dataset**:
+- Download the CMS 2008-2010 Data Entrepreneurs’ Synthetic Public Use File (DE-SynPUF) Sample 9 from the official CMS repository.
+- Create a data/raw/ directory in the root of this project and place the downloaded files inside:
+  - Beneficiary & Carrier Data: Keep as .zip files.
+  - Inpatient, Outpatient, & PDE: Ensure these are .csv files.
+    
+4. **Run the pipeline**:
+- Execute the notebooks in numerical order (0_ through 4_).
+- Once complete, the pipeline will automatically generate a results/ directory containing all SHAP plots, model evaluation metrics, and risk stratification tables referenced in this README and the ANALYSIS.md report.
+
+**Performance Note**: The Carrier Claims dataset contains ~34M+ records per year. The data loading and merging step for Carrier data will take several minutes to process. This is expected behavior as the pipeline absorbs this complexity to output a highly optimized, feature-engineered dataset.
