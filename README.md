@@ -94,7 +94,7 @@ This project is fully reproducible and engineered for frictionless execution. Th
    pip install -r requirements.txt
    
 3. **Acquire the dataset**:
-- Download the CMS 2008-2010 Data Entrepreneurs’ Synthetic Public Use File (DE-SynPUF) Sample 9 from the official CMS repository.
+- Download all 8 data files from the CMS 2008-2010 Data Entrepreneurs’ Synthetic Public Use File (DE-SynPUF) [Sample 9 data records](https://www.cms.gov/data-research/statistics-trends-and-reports/medicare-claims-synthetic-public-use-files/cms-2008-2010-data-entrepreneurs-synthetic-public-use-file-de-synpuf/de10-sample-9?spm=a2ty_o01.29997173.0.0.7ebc55fbr53eDo).
 - Create a data/raw/ directory in the root of this project and place the downloaded files inside:
   - Beneficiary & Carrier Data: Keep as .zip files.
   - Inpatient, Outpatient, & PDE: Ensure these are .csv files.
